@@ -2,47 +2,40 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Bot, ArrowRight, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { Bot, ArrowLeft, Eye, EyeOff, Loader2, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { useAuthContext } from '@/contexts/AuthContext';
-import { useFormValidation, usePasswordStrength } from '@/hooks/useAuth';
+import { usePasswordStrength } from '@/hooks/useAuth';
 
 // Form validation schema
-const signupSchema = z.object({
-  name: z.string()
-    .min(2, 'Name must be at least 2 characters')
-    .max(50, 'Name must be less than 50 characters'),
-  email: z.string()
-    .min(1, 'Email is required')
-    .email('Please enter a valid email address'),
+const resetPasswordSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(100, 'Password must be less than 100 characters'),
   confirmPassword: z.string()
     .min(1, 'Please confirm your password'),
-  organizationName: z.string()
-    .min(2, 'Organization name must be at least 2 characters')
-    .max(100, 'Organization name must be less than 100 characters')
-    .optional(),
-  acceptTerms: z.boolean()
-    .refine(val => val === true, 'You must accept the terms and conditions'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
-type SignupFormData = z.infer<typeof signupSchema>;
+type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
-export default function SignupPage() {
+export default function ResetPasswordPage() {
   const navigate = useNavigate();
-  const { signup, isSigningUp, isAuthenticated } = useAuthContext();
-  const { validateEmail, validatePassword, validateName } = useFormValidation();
+  const [searchParams] = useSearchParams();
+  const { confirmPasswordReset, isConfirmingPasswordReset } = useAuthContext();
   const { calculateStrength } = usePasswordStrength();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: [], isValid: false });
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [token, setToken] = useState<string>('');
 
   const {
     register,
@@ -51,15 +44,23 @@ export default function SignupPage() {
     watch,
     setError,
     clearErrors
-  } = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
     mode: 'onChange',
   });
 
   const passwordValue = watch('password');
   const confirmPasswordValue = watch('confirmPassword');
-  const emailValue = watch('email');
-  const nameValue = watch('name');
+
+  // Get token from URL params
+  useEffect(() => {
+    const tokenParam = searchParams.get('token');
+    if (!tokenParam) {
+      navigate('/forgot-password');
+      return;
+    }
+    setToken(tokenParam);
+  }, [searchParams, navigate]);
 
   // Real-time password strength calculation
   useEffect(() => {
@@ -82,44 +83,15 @@ export default function SignupPage() {
     }
   }, [confirmPasswordValue, passwordValue, setError, clearErrors]);
 
-  // Real-time email validation
-  useEffect(() => {
-    if (emailValue && emailValue.length > 0) {
-      if (!validateEmail(emailValue)) {
-        setError('email', { message: 'Please enter a valid email address' });
-      } else {
-        clearErrors('email');
-      }
-    }
-  }, [emailValue, validateEmail, setError, clearErrors]);
-
-  // Real-time name validation
-  useEffect(() => {
-    if (nameValue && nameValue.length > 0) {
-      const validation = validateName(nameValue);
-      if (!validation.isValid) {
-        setError('name', { message: validation.message });
-      } else {
-        clearErrors('name');
-      }
-    }
-  }, [nameValue, validateName, setError, clearErrors]);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, navigate]);
-
-  const onSubmit = (data: SignupFormData) => {
-    signup({
-      name: data.name,
-      email: data.email,
+  const onSubmit = (data: ResetPasswordFormData) => {
+    if (!token) return;
+    
+    confirmPasswordReset({
+      token,
       password: data.password,
-      organizationName: data.organizationName,
-      acceptTerms: data.acceptTerms,
+      confirmPassword: data.confirmPassword,
     });
+    setIsSubmitted(true);
   };
 
   const getPasswordStrengthColor = (score: number) => {
@@ -135,6 +107,67 @@ export default function SignupPage() {
     if (score <= 3) return 'Good';
     return 'Strong';
   };
+
+  if (isSubmitted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Animated background gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 animate-pulse" />
+        
+        <div className="w-full max-w-md space-y-6 relative z-10">
+          <div className="text-center animate-fade-in">
+            <div className="flex items-center justify-center space-x-2 mb-4 group">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <Bot className="h-7 w-7 text-primary-foreground" />
+              </div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+                OpsCrew
+              </h1>
+            </div>
+          </div>
+
+          <Card className="card-hover animate-slide-up">
+            <CardHeader className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <CardTitle className="text-2xl">Password reset successful</CardTitle>
+              <CardDescription className="text-base">
+                Your password has been successfully reset. You can now sign in with your new password.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Link to="/login">
+                <Button className="w-full btn-primary h-12 text-base font-medium">
+                  Continue to Sign In
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        <style jsx>{`
+          @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          
+          @keyframes slide-up {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          
+          .animate-fade-in {
+            animation: fade-in 0.6s ease-out forwards;
+          }
+          
+          .animate-slide-up {
+            animation: slide-up 0.8s ease-out forwards;
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
@@ -160,88 +193,27 @@ export default function SignupPage() {
               OpsCrew
             </h1>
           </div>
-          <p className="text-muted-foreground text-lg">Create your account</p>
+          <p className="text-muted-foreground text-lg">Set your new password</p>
         </div>
 
         <Card className="card-hover animate-slide-up">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Get started</CardTitle>
+            <CardTitle className="text-2xl">Reset your password</CardTitle>
             <CardDescription className="text-base">
-              Create your account to start automating your agency operations
+              Enter your new password below. Make sure it's strong and secure.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Full Name
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    className={`input-focus transition-all duration-200 ${
-                      errors.name ? 'border-destructive focus:ring-destructive' : ''
-                    }`}
-                    {...register('name')}
-                  />
-                  {errors.name && (
-                    <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-destructive" />
-                  )}
-                </div>
-                {errors.name && (
-                  <p className="text-sm text-destructive animate-shake">
-                    {errors.name.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    className={`input-focus transition-all duration-200 ${
-                      errors.email ? 'border-destructive focus:ring-destructive' : ''
-                    }`}
-                    {...register('email')}
-                  />
-                  {errors.email && (
-                    <AlertCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-destructive" />
-                  )}
-                </div>
-                {errors.email && (
-                  <p className="text-sm text-destructive animate-shake">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="organizationName" className="text-sm font-medium">
-                  Organization Name (Optional)
-                </Label>
-                <Input
-                  id="organizationName"
-                  placeholder="Acme Agency"
-                  className="input-focus transition-all duration-200"
-                  {...register('organizationName')}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">
-                  Password
+                  New Password
                 </Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Create a strong password"
+                    placeholder="Enter your new password"
                     className={`input-focus transition-all duration-200 ${
                       errors.password ? 'border-destructive focus:ring-destructive' : ''
                     }`}
@@ -277,7 +249,7 @@ export default function SignupPage() {
                       value={(passwordStrength.score / 4) * 100} 
                       className="h-2"
                     />
-                    <div className="flex items-center space-x-1">
+                    <div className="space-y-1">
                       {passwordStrength.feedback.map((feedback, index) => (
                         <div key={index} className="flex items-center space-x-1 text-xs text-muted-foreground">
                           <XCircle className="h-3 w-3" />
@@ -297,13 +269,13 @@ export default function SignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                  Confirm Password
+                  Confirm New Password
                 </Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
+                    placeholder="Confirm your new password"
                     className={`input-focus transition-all duration-200 ${
                       errors.confirmPassword ? 'border-destructive focus:ring-destructive' : ''
                     }`}
@@ -331,63 +303,34 @@ export default function SignupPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-start space-x-2">
-                  <input
-                    id="acceptTerms"
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-2 focus:ring-ring focus:ring-offset-2 mt-1"
-                    {...register('acceptTerms')}
-                  />
-                  <div className="space-y-1">
-                    <Label htmlFor="acceptTerms" className="text-sm text-muted-foreground leading-relaxed">
-                      I agree to the{' '}
-                      <Link to="/terms" className="text-primary hover:text-primary/80 underline">
-                        Terms of Service
-                      </Link>{' '}
-                      and{' '}
-                      <Link to="/privacy" className="text-primary hover:text-primary/80 underline">
-                        Privacy Policy
-                      </Link>
-                    </Label>
-                    {errors.acceptTerms && (
-                      <p className="text-sm text-destructive animate-shake">
-                        {errors.acceptTerms.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <Button 
                 type="submit" 
                 className="w-full btn-primary h-12 text-base font-medium"
-                disabled={!isValid || isSigningUp || !passwordStrength.isValid}
+                disabled={!isValid || isConfirmingPasswordReset || !passwordStrength.isValid}
               >
-                {isSigningUp ? (
+                {isConfirmingPasswordReset ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating account...
+                    Resetting password...
                   </>
                 ) : (
                   <>
-                    Create Account
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                    Reset Password
                   </>
                 )}
               </Button>
             </form>
+
+            <div className="pt-4">
+              <Link to="/login">
+                <Button variant="outline" className="w-full">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Sign In
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="text-center text-sm animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <span className="text-muted-foreground">Already have an account? </span>
-          <Link to="/login">
-            <Button variant="link" className="p-0 h-auto text-primary hover:text-primary/80 transition-colors duration-200">
-              Sign in
-            </Button>
-          </Link>
-        </div>
       </div>
 
       <style jsx>{`

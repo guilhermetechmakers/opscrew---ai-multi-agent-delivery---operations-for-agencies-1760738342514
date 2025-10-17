@@ -1,11 +1,18 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "sonner";
+
+// Auth Context
+import { AuthProvider } from "@/contexts/AuthContext";
+
+// Route Guards
+import { ProtectedRoute, PublicRoute, RoleRoute } from "@/components/ProtectedRoute";
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
 import LoginPage from "@/pages/LoginPage";
 import SignupPage from "@/pages/SignupPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import EmailVerificationPage from "@/pages/EmailVerificationPage";
 import DashboardLayout from "@/pages/DashboardLayout";
 import Dashboard from "@/pages/Dashboard";
@@ -26,35 +33,49 @@ import PricingCheckout from "@/pages/PricingCheckout";
 import PrivacyTerms from "@/pages/PrivacyTerms";
 import NotFound from "@/pages/NotFound";
 
-// React Query client with optimal defaults
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <AuthProvider>
       <BrowserRouter>
         <div className="min-h-screen bg-background text-foreground">
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/verify-email" element={<EmailVerificationPage />} />
+            <Route path="/login" element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            } />
+            <Route path="/signup" element={
+              <PublicRoute>
+                <SignupPage />
+              </PublicRoute>
+            } />
+            <Route path="/forgot-password" element={
+              <PublicRoute>
+                <ForgotPasswordPage />
+              </PublicRoute>
+            } />
+            <Route path="/reset-password" element={
+              <PublicRoute>
+                <ResetPasswordPage />
+              </PublicRoute>
+            } />
+            <Route path="/verify-email" element={
+              <PublicRoute>
+                <EmailVerificationPage />
+              </PublicRoute>
+            } />
             <Route path="/pricing" element={<PricingCheckout />} />
             <Route path="/docs" element={<DocsHelpCenter />} />
             <Route path="/privacy" element={<PrivacyTerms />} />
             
-            {/* Dashboard Routes */}
-            <Route path="/dashboard" element={<DashboardLayout />}>
+            {/* Protected Dashboard Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Dashboard />} />
               <Route path="intake" element={<IntakeChat />} />
               <Route path="proposals" element={<ProposalEditor />} />
@@ -66,19 +87,28 @@ function App() {
               <Route path="handover" element={<HandoverKnowledgeBase />} />
               <Route path="support" element={<SupportSLATriage />} />
               <Route path="settings" element={<SettingsPreferences />} />
-              <Route path="admin" element={<AdminDashboard />} />
+              <Route path="admin" element={
+                <RoleRoute requiredRole="admin">
+                  <AdminDashboard />
+                </RoleRoute>
+              } />
             </Route>
             
-            {/* Client Portal */}
+            {/* Client Portal - Public but may need project access validation */}
             <Route path="/portal/:projectId" element={<ClientPortal />} />
             
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
-        <Toaster />
+        <Toaster 
+          position="top-right"
+          expand={true}
+          richColors={true}
+          closeButton={true}
+        />
       </BrowserRouter>
-    </QueryClientProvider>
+    </AuthProvider>
   );
 }
 
